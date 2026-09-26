@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Lock,
   Mail,
+  User,
   Eye,
   EyeOff,
   ArrowLeft,
@@ -19,13 +20,11 @@ import {
   Radio,
   FileCheck2,
   Server,
-  KeyRound,
-  ExternalLink,
+  Building,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardHeader,
@@ -34,26 +33,40 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { signInWithEmail, signInWithGoogle } from "@/lib/firebase";
+import { signUpWithEmail, signInWithGoogle } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 
-export default function LoginPage() {
+export default function SignupPage() {
   const router = useRouter();
 
   // Form states
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Validation & UI states
-  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
+  const [errors, setErrors] = useState<{
+    name?: string;
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+    general?: string;
+  }>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [loginSuccess, setLoginSuccess] = useState(false);
-  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const validateForm = () => {
-    const newErrors: { email?: string; password?: string; general?: string } = {};
+    const newErrors: typeof errors = {};
+
+    if (!name.trim()) {
+      newErrors.name = "Full Official Name is required";
+    } else if (name.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters";
+    }
 
     if (!email.trim()) {
       newErrors.email = "Official Email is required";
@@ -67,46 +80,71 @@ export default function LoginPage() {
       newErrors.password = "Password must be at least 6 characters";
     }
 
+    if (!confirmPassword) {
+      newErrors.confirmPassword = "Confirm password is required";
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
     setIsLoading(true);
-    setLoginSuccess(false);
+    setSignupSuccess(false);
     setErrors((prev) => ({ ...prev, general: undefined }));
 
     try {
-      const { user, error } = await signInWithEmail(email, password);
+      // 1. Firebase Authentication: Create User Account
+      const { user, error } = await signUpWithEmail(email, password, name.trim());
 
       if (error || !user) {
         setIsLoading(false);
         setErrors((prev) => ({
           ...prev,
-          general: error || "Authentication failed. Please verify your credentials.",
+          general: error || "Account registration failed. Please try again.",
         }));
         return;
       }
 
-      // Success
+      // 2. Supabase: Create corresponding row in user_profiles table
+      try {
+        const { error: profileError } = await supabase.from("user_profiles").insert({
+          id: user.uid,
+          email: user.email || email.trim(),
+          display_name: name.trim(),
+          role: "analyst",
+          department: "National Weather Forecasting Centre (NWFC)",
+          station_id: "DEL-HQ-01",
+        });
+
+        if (profileError) {
+          console.warn("[Supabase] user_profiles insert notice:", profileError.message);
+        }
+      } catch (dbErr) {
+        console.warn("[Supabase] Could not insert user profile row:", dbErr);
+      }
+
+      // 3. Success Feedback & Redirect
       setIsLoading(false);
-      setLoginSuccess(true);
+      setSignupSuccess(true);
 
       setTimeout(() => {
         router.push("/dashboard");
-      }, 600);
+      }, 700);
     } catch (err: unknown) {
       setIsLoading(false);
-      const message = err instanceof Error ? err.message : "An unexpected authentication error occurred.";
+      const message = err instanceof Error ? err.message : "An unexpected registration error occurred.";
       setErrors((prev) => ({ ...prev, general: message }));
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     setIsGoogleLoading(true);
     setErrors((prev) => ({ ...prev, general: undefined }));
 
@@ -117,36 +155,49 @@ export default function LoginPage() {
         setIsGoogleLoading(false);
         setErrors((prev) => ({
           ...prev,
-          general: error || "Google sign-in could not be completed.",
+          general: error || "Google registration could not be completed.",
         }));
         return;
       }
 
+      // Ensure profile row exists in Supabase
+      try {
+        await supabase.from("user_profiles").upsert(
+          {
+            id: user.uid,
+            email: user.email || "",
+            display_name: user.displayName || "Meteorologist Analyst",
+            role: "analyst",
+            department: "IMD Weather Analytics",
+            station_id: "DEL-HQ-01",
+          },
+          { onConflict: "id" }
+        );
+      } catch (dbErr) {
+        console.warn("[Supabase] Profile upsert notice:", dbErr);
+      }
+
       setIsGoogleLoading(false);
-      setLoginSuccess(true);
+      setSignupSuccess(true);
 
       setTimeout(() => {
         router.push("/dashboard");
       }, 600);
     } catch (err: unknown) {
       setIsGoogleLoading(false);
-      const message = err instanceof Error ? err.message : "Google authentication error.";
+      const message = err instanceof Error ? err.message : "Google registration error.";
       setErrors((prev) => ({ ...prev, general: message }));
     }
   };
 
   return (
     <div className="min-h-screen w-full flex flex-col lg:flex-row bg-slate-50 selection:bg-blue-600 selection:text-white">
-      {/* 1. Mobile Visual Banner (Visible only on small screens) */}
+      {/* 1. Mobile Visual Banner */}
       <div className="lg:hidden bg-gradient-to-b from-[#071324] to-[#0c1f3c] text-white p-6 border-b border-[#1b2f4d] relative overflow-hidden">
-        {/* Subtle grid pattern */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e3355_1px,transparent_1px),linear-gradient(to_bottom,#1e3355_1px,transparent_1px)] bg-[size:2rem_2rem] opacity-30 pointer-events-none" />
 
         <div className="relative z-10 flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-white group"
-          >
+          <Link href="/" className="flex items-center gap-2 text-white">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-600 text-white shadow-xs">
               <Activity className="w-4 h-4" />
             </div>
@@ -156,7 +207,7 @@ export default function LoginPage() {
           </Link>
 
           <Badge variant="outline" className="text-[10px] text-sky-300 border-blue-400/40 bg-blue-950/60">
-            256-bit Encrypted
+            Official Registration
           </Badge>
         </div>
 
@@ -165,32 +216,32 @@ export default function LoginPage() {
             Ministry of Earth Sciences • IMD
           </p>
           <h2 className="text-lg font-bold text-white tracking-tight mt-0.5">
-            National Weather Big Data Analytics Console
+            Analyst Account Onboarding
           </h2>
         </div>
       </div>
 
-      {/* 2. Left Side: Login Form (40% width on Desktop) */}
+      {/* 2. Left Side: Signup Form (42% width on Desktop) */}
       <div className="w-full lg:w-[42%] flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 bg-white border-r border-slate-200 z-10">
         {/* Top Header: Logo / Back Link */}
         <div className="flex items-center justify-between">
           <Link
-            href="/"
+            href="/login"
             className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-blue-700 transition-colors group"
           >
             <ArrowLeft className="w-4 h-4 text-slate-400 group-hover:-translate-x-0.5 transition-transform" />
-            <span>Return to WeatherDataX</span>
+            <span>Back to Sign In</span>
           </Link>
 
           <span className="hidden sm:inline-flex text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-            Internal Portal
+            New Onboarding
           </span>
         </div>
 
-        {/* Center: The Login Card */}
-        <div className="my-auto py-8 max-w-md w-full mx-auto">
+        {/* Center: The Signup Card */}
+        <div className="my-auto py-6 max-w-md w-full mx-auto">
           <Card className="border-0 sm:border sm:border-slate-200 shadow-none sm:shadow-lg bg-white rounded-2xl">
-            <CardHeader className="space-y-2 pb-6">
+            <CardHeader className="space-y-2 pb-5">
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700">
                   <ShieldCheck className="w-5 h-5" />
@@ -199,27 +250,26 @@ export default function LoginPage() {
                   variant="outline"
                   className="text-[10.5px] font-semibold text-blue-800 border-blue-200 bg-blue-50/70"
                 >
-                  MoES • IMD Operational Node
+                  IMD Analyst Enrollment
                 </Badge>
               </div>
 
               <CardTitle className="text-2xl font-bold text-[#0a192f] tracking-tight font-heading pt-1">
-                IMD Weather Analytics — Secure Access
+                Create Analyst Profile
               </CardTitle>
               <CardDescription className="text-xs text-slate-500 leading-relaxed">
-                Enter your authorized credentials to access national sensor streams,
-                verification feeds, and emergency hazard broadcasting consoles.
+                Register authorized analyst credentials for the national weather big data telemetry network.
               </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4">
               {/* Success Notification */}
-              {loginSuccess && (
+              {signupSuccess && (
                 <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   <div>
-                    <strong className="block font-semibold">Authentication Verified</strong>
-                    <span>Establishing secure tunnel to analytics console...</span>
+                    <strong className="block font-semibold">Registration Successful</strong>
+                    <span>Creating analyst database record & redirecting...</span>
                   </div>
                 </div>
               )}
@@ -229,138 +279,168 @@ export default function LoginPage() {
                 <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
                   <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                   <div>
-                    <strong className="block font-semibold">Authentication Failed</strong>
+                    <strong className="block font-semibold">Registration Failed</strong>
                     <span>{errors.general}</span>
                   </div>
                 </div>
               )}
 
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleSignup} className="space-y-3.5">
+                {/* Name Field */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Full Official Name
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="Dr. Rajesh V. Sharma"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+                      }}
+                      className={`pl-9 h-9 bg-slate-50/60 text-xs border-slate-300 focus-visible:ring-blue-600 ${
+                        errors.name ? "border-red-500 focus-visible:ring-red-500" : ""
+                      }`}
+                      disabled={isLoading || isGoogleLoading || signupSuccess}
+                    />
+                  </div>
+                  {errors.name && (
+                    <p className="text-[11px] text-red-600 flex items-center gap-1 mt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.name}</span>
+                    </p>
+                  )}
+                </div>
+
                 {/* Email Field */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-                    <span>Official Email / Account ID</span>
-                    <span className="text-[11px] font-normal text-slate-400">IMD / MoES</span>
+                    <span>Government / Official Email</span>
+                    <span className="text-[10px] text-slate-400">gov.in / organization</span>
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <Input
                       type="email"
-                      placeholder="analyst.weather@imd.gov.in"
+                      placeholder="rajesh.sharma@imd.gov.in"
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
-                        if (errors.email || errors.general) {
-                          setErrors((prev) => ({ ...prev, email: undefined, general: undefined }));
-                        }
+                        if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
                       }}
-                      className={`pl-9 h-10 bg-slate-50/60 text-sm border-slate-300 focus-visible:ring-blue-600 ${
+                      className={`pl-9 h-9 bg-slate-50/60 text-xs border-slate-300 focus-visible:ring-blue-600 ${
                         errors.email ? "border-red-500 focus-visible:ring-red-500" : ""
                       }`}
-                      disabled={isLoading || isGoogleLoading || loginSuccess}
+                      disabled={isLoading || isGoogleLoading || signupSuccess}
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-[11px] text-red-600 flex items-center gap-1 mt-1">
+                    <p className="text-[11px] text-red-600 flex items-center gap-1 mt-0.5">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       <span>{errors.email}</span>
                     </p>
                   )}
                 </div>
 
-                {/* Password Field with Show/Hide Toggle */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-slate-700">
-                      Password / Security Key
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setShowSupportModal(true)}
-                      className="text-[11px] text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
+                {/* Password Field */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Create Password
+                  </label>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="••••••••••••"
+                      placeholder="Minimum 6 characters"
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value);
-                        if (errors.password || errors.general) {
-                          setErrors((prev) => ({ ...prev, password: undefined, general: undefined }));
-                        }
+                        if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
                       }}
-                      className={`pl-9 pr-10 h-10 bg-slate-50/60 text-sm border-slate-300 focus-visible:ring-blue-600 ${
+                      className={`pl-9 pr-9 h-9 bg-slate-50/60 text-xs border-slate-300 focus-visible:ring-blue-600 ${
                         errors.password ? "border-red-500 focus-visible:ring-red-500" : ""
                       }`}
-                      disabled={isLoading || isGoogleLoading || loginSuccess}
+                      disabled={isLoading || isGoogleLoading || signupSuccess}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                       tabIndex={-1}
-                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
-                      {showPassword ? (
-                        <EyeOff className="w-4 h-4" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="text-[11px] text-red-600 flex items-center gap-1 mt-1">
+                    <p className="text-[11px] text-red-600 flex items-center gap-1 mt-0.5">
                       <AlertCircle className="w-3 h-3 shrink-0" />
                       <span>{errors.password}</span>
                     </p>
                   )}
                 </div>
 
-                {/* Remember This Device Checkbox */}
-                <div className="flex items-center justify-between pt-1">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="remember"
-                      checked={rememberMe}
-                      onCheckedChange={(checked) => setRememberMe(checked === true)}
+                {/* Confirm Password Field */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Input
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Re-enter password"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        if (errors.confirmPassword) {
+                          setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                        }
+                      }}
+                      className={`pl-9 pr-9 h-9 bg-slate-50/60 text-xs border-slate-300 focus-visible:ring-blue-600 ${
+                        errors.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""
+                      }`}
+                      disabled={isLoading || isGoogleLoading || signupSuccess}
                     />
-                    <label
-                      htmlFor="remember"
-                      className="text-xs font-medium text-slate-700 cursor-pointer select-none"
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      tabIndex={-1}
                     >
-                      Remember this device
-                    </label>
+                      {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  <span className="text-[10.5px] text-slate-400 hidden sm:inline">
-                    30-day session
-                  </span>
+                  {errors.confirmPassword && (
+                    <p className="text-[11px] text-red-600 flex items-center gap-1 mt-0.5">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      <span>{errors.confirmPassword}</span>
+                    </p>
+                  )}
                 </div>
 
-                {/* Primary Sign In Button */}
+                {/* Submit Button */}
                 <Button
                   type="submit"
-                  disabled={isLoading || isGoogleLoading || loginSuccess}
-                  className="w-full h-10 bg-[#0a192f] hover:bg-[#162f55] text-white font-medium shadow-sm transition-all gap-2 mt-2"
+                  disabled={isLoading || isGoogleLoading || signupSuccess}
+                  className="w-full h-10 bg-[#0a192f] hover:bg-[#162f55] text-white font-medium shadow-sm transition-all gap-2 mt-3"
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
-                      <span>Authenticating with Firebase...</span>
+                      <span>Registering Analyst Account...</span>
                     </>
-                  ) : loginSuccess ? (
+                  ) : signupSuccess ? (
                     <>
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>Access Granted</span>
+                      <span>Account Created</span>
                     </>
                   ) : (
                     <>
-                      <Lock className="w-3.5 h-3.5 text-sky-400" />
-                      <span>Sign In to Analytics Console</span>
+                      <ShieldCheck className="w-4 h-4 text-sky-400" />
+                      <span>Complete Registration</span>
                     </>
                   )}
                 </Button>
@@ -373,18 +453,18 @@ export default function LoginPage() {
                 </div>
                 <div className="relative flex justify-center text-[10.5px] uppercase">
                   <span className="bg-white px-2 text-slate-400 font-semibold tracking-wider">
-                    Or continue with
+                    Or sign up with
                   </span>
                 </div>
               </div>
 
-              {/* Continue with Google Button */}
+              {/* Continue with Google */}
               <Button
                 type="button"
                 variant="outline"
-                disabled={isLoading || isGoogleLoading || loginSuccess}
-                onClick={handleGoogleLogin}
-                className="w-full h-10 border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-xs gap-2.5 shadow-2xs"
+                disabled={isLoading || isGoogleLoading || signupSuccess}
+                onClick={handleGoogleSignup}
+                className="w-full h-9 border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-xs gap-2.5 shadow-2xs"
               >
                 {isGoogleLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
@@ -408,87 +488,30 @@ export default function LoginPage() {
                     />
                   </svg>
                 )}
-                <span>Continue with Google Workspace</span>
+                <span>Sign Up with Google Workspace</span>
               </Button>
 
-              {/* Link to Signup */}
+              {/* Already have an account */}
               <div className="pt-2 text-center border-t border-slate-100">
                 <p className="text-xs text-slate-600">
-                  Don&apos;t have an analyst account?{" "}
+                  Already registered?{" "}
                   <Link
-                    href="/signup"
+                    href="/login"
                     className="text-blue-700 font-bold hover:underline"
                   >
-                    Register New Analyst
+                    Sign In to Existing Account
                   </Link>
-                </p>
-              </div>
-
-              {/* Security Advisory Pill */}
-              <div className="mt-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-2">
-                <FileCheck2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                <p>
-                  Notice: All session logins are audited in compliance with CERT-In and MoES cybersecurity frameworks.
                 </p>
               </div>
             </CardContent>
 
-            <CardFooter className="pt-2 pb-4 text-center justify-center">
-              <p className="text-xs text-slate-500">
-                Facing authentication trouble?{" "}
-                <button
-                  type="button"
-                  onClick={() => setShowSupportModal(true)}
-                  className="text-blue-700 font-semibold hover:underline"
-                >
-                  Contact System Admin
-                </button>
+            <CardFooter className="pt-1 pb-4 text-center justify-center">
+              <p className="text-[11px] text-slate-400">
+                By registering, you agree to comply with IMD Official Secrets & Data Ethics norms.
               </p>
             </CardFooter>
           </Card>
         </div>
-
-        {/* Support Modal dialog fallback */}
-        {showSupportModal && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 space-y-4">
-              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center">
-                <KeyRound className="w-5 h-5" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-slate-900">
-                  System Admin Assistance
-                </h3>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  For password resets or multi-factor token reissue, reach out to the IMD Central Informatics Helpdesk.
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2">
-                <div>
-                  <span className="text-slate-500 block">NIC Technical Helpdesk:</span>
-                  <strong className="text-slate-900">1800-180-1717 (Ext. 402)</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Official Support Email:</span>
-                  <a
-                    href="mailto:admin.auth@imd.gov.in"
-                    className="text-blue-600 hover:underline font-medium"
-                  >
-                    admin.auth@imd.gov.in
-                  </a>
-                </div>
-              </div>
-              <Button
-                variant="default"
-                size="sm"
-                className="w-full bg-[#0a192f] text-white"
-                onClick={() => setShowSupportModal(false)}
-              >
-                Close Support Notice
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Bottom Footer Attribution */}
         <div className="text-[11px] text-slate-400 text-center sm:text-left flex items-center justify-between">
@@ -497,17 +520,15 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* 3. Right Side: Visual Panel (60% width on Desktop) */}
+      {/* 3. Right Side: Visual Panel (58% width on Desktop) */}
       <div className="hidden lg:flex lg:w-[58%] bg-gradient-to-br from-[#071324] via-[#0b1d3a] to-[#08152b] text-white relative flex-col justify-between p-12 xl:p-16 overflow-hidden">
-        {/* Radar Ring Pattern & Coordinate Grid */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e3355_1px,transparent_1px),linear-gradient(to_bottom,#1e3355_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-35 pointer-events-none" />
 
-        {/* Concentric Radar Rings */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] border border-blue-500/10 rounded-full pointer-events-none" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] border border-sky-400/15 rounded-full pointer-events-none" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] border border-blue-400/20 rounded-full pointer-events-none" />
 
-        {/* Top Row: System Status & Security Badge */}
+        {/* Top Status */}
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-700 to-indigo-900 flex items-center justify-center text-white shadow-md ring-1 ring-blue-400/30">
@@ -525,53 +546,51 @@ export default function LoginPage() {
 
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#12243d] border border-blue-500/30 text-sky-300 text-xs font-semibold backdrop-blur-md">
             <Shield className="w-3.5 h-3.5 text-emerald-400" />
-            <span>256-bit Encrypted • NIC Compliant</span>
+            <span>Authorized Analyst Onboarding</span>
           </div>
         </div>
 
-        {/* Center: Hero Statement & Telemetry Badge */}
+        {/* Center Content */}
         <div className="relative z-10 max-w-xl my-auto space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/50 border border-blue-400/30 text-sky-300 text-xs font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Restricted Meteorological Authority Access</span>
+            <span>National Telemetry Integration</span>
           </div>
 
           <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight text-white font-heading leading-tight">
-            National Weather Big Data{" "}
+            Join the Central Weather{" "}
             <span className="bg-gradient-to-r from-sky-400 to-indigo-300 bg-clip-text text-transparent">
-              Analytics Platform
+              Intelligence Grid
             </span>
           </h1>
 
           <p className="text-slate-300 text-sm xl:text-base leading-relaxed">
-            Secure, mission-critical portal for verified India Meteorological Department (IMD)
-            meteorologists, NDMA and State Disaster Management Authority (SDMA) command cells,
-            and authorized atmospheric data scientists.
+            Collaborate on verifying multi-source weather anomalies across Indian districts.
+            Access high-velocity Doppler radar streams, citizen sensor feeds, and AI forensic analysis tools.
           </p>
 
-          {/* Real-time Status Card Strip */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div className="p-3.5 rounded-xl bg-[#0e1f38]/80 border border-[#1b345b] backdrop-blur-sm space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                <span>Active Ingestion Mesh</span>
+                <Building className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Inter-Agency Mesh</span>
               </div>
-              <div className="text-base font-bold text-white">1,480+ Nodes Online</div>
-              <div className="text-[11px] text-emerald-400">All feeds operational</div>
+              <div className="text-base font-bold text-white">IMD • NDMA • CWC</div>
+              <div className="text-[11px] text-emerald-400">Unified Emergency Alerts</div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-[#0e1f38]/80 border border-[#1b345b] backdrop-blur-sm space-y-1">
               <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <Server className="w-3.5 h-3.5 text-sky-400" />
-                <span>Security Protocol</span>
+                <span>Data Storage</span>
               </div>
-              <div className="text-base font-bold text-white">TLS 1.3 / MFA</div>
-              <div className="text-[11px] text-sky-300">CERT-In Hardened</div>
+              <div className="text-base font-bold text-white">Supabase + Firebase</div>
+              <div className="text-[11px] text-sky-300">Synchronized Profiles</div>
             </div>
           </div>
         </div>
 
-        {/* Bottom Strip: Safeguard Statement */}
+        {/* Bottom Strip */}
         <div className="relative z-10 pt-6 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
           <p>
             Safeguarding communities with real-time crowd and radar intelligence.

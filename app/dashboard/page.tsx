@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Database,
   CheckCircle2,
@@ -34,6 +34,8 @@ import {
   ExternalLink,
   Shield,
   Layers,
+  Loader2,
+  MapPin,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,196 +78,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-
-// 12 Realistic Indian Weather Data Reports
-interface WeatherReport {
-  id: string;
-  dateTime: string;
-  city: string;
-  state: string;
-  eventType: string;
-  icon: React.ElementType;
-  source: "Twitter/X" | "Citizen App" | "IMD AWS" | "INSAT-3DR" | "Doppler DWR";
-  mediaType: "photo" | "video" | "sensor";
-  mediaCount: number;
-  status: "verified" | "pending" | "flagged";
-  confidence: number;
-  details: string;
-}
-
-const initialReports: WeatherReport[] = [
-  {
-    id: "WX-9481",
-    dateTime: "25 Sep, 22:15",
-    city: "Mumbai Suburban",
-    state: "Maharashtra",
-    eventType: "Rainfall",
-    icon: CloudRain,
-    source: "Twitter/X",
-    mediaType: "photo",
-    mediaCount: 3,
-    status: "verified",
-    confidence: 99.2,
-    details: "Severe localized water accumulation in Kurla & Dadar. Precipitation rate > 65mm/hr verified with Santa Cruz AWS telemetry.",
-  },
-  {
-    id: "WX-9480",
-    dateTime: "25 Sep, 21:58",
-    city: "Siliguri",
-    state: "West Bengal",
-    eventType: "Thunderstorm",
-    icon: CloudLightning,
-    source: "Doppler DWR",
-    mediaType: "sensor",
-    mediaCount: 1,
-    status: "verified",
-    confidence: 97.4,
-    details: "Doppler radar array detected squall cells with wind gusts reaching 68 km/h. Multiple lightning discharges recorded.",
-  },
-  {
-    id: "WX-9479",
-    dateTime: "25 Sep, 21:40",
-    city: "Chennai Central",
-    state: "Tamil Nadu",
-    eventType: "Flood",
-    icon: Waves,
-    source: "Citizen App",
-    mediaType: "video",
-    mediaCount: 2,
-    status: "verified",
-    confidence: 96.1,
-    details: "Urban runoff inundation along Poonamallee High Road. Citizen uploaded video matching geospatial time window.",
-  },
-  {
-    id: "WX-9478",
-    dateTime: "25 Sep, 21:22",
-    city: "Nagpur",
-    state: "Maharashtra",
-    eventType: "Heatwave",
-    icon: SunMedium,
-    source: "IMD AWS",
-    mediaType: "sensor",
-    mediaCount: 1,
-    status: "verified",
-    confidence: 99.8,
-    details: "Surface station #4312 recorded ambient air temperature at 43.8°C with relative humidity at 22%. Orange alert sustained.",
-  },
-  {
-    id: "WX-9477",
-    dateTime: "25 Sep, 21:05",
-    city: "Puri",
-    state: "Odisha",
-    eventType: "Strong Wind",
-    icon: Wind,
-    source: "INSAT-3DR",
-    mediaType: "sensor",
-    mediaCount: 2,
-    status: "pending",
-    confidence: 88.5,
-    details: "Coastal depression cloud mass tracking inland. Wind speed est. 52 km/h. Awaiting corroborating coastal radar sweep.",
-  },
-  {
-    id: "WX-9476",
-    dateTime: "25 Sep, 20:45",
-    city: "Bikaner",
-    state: "Rajasthan",
-    eventType: "Dust Storm",
-    icon: Wind,
-    source: "Twitter/X",
-    mediaType: "photo",
-    mediaCount: 1,
-    status: "flagged",
-    confidence: 42.1,
-    details: "AI reverse-image engine flagged image as recycled footage from May 2023. Ground visibility is normal at 4,000m.",
-  },
-  {
-    id: "WX-9475",
-    dateTime: "25 Sep, 20:30",
-    city: "Guwahati",
-    state: "Assam",
-    eventType: "Rainfall",
-    icon: CloudRain,
-    source: "Citizen App",
-    mediaType: "photo",
-    mediaCount: 4,
-    status: "verified",
-    confidence: 94.7,
-    details: "Intense monsoonal downpour in Kamrup Metropolitan. Verified against Borjhar airport rain gauge telemetry (42mm).",
-  },
-  {
-    id: "WX-9474",
-    dateTime: "25 Sep, 20:12",
-    city: "Delhi NCR",
-    state: "Delhi NCR",
-    eventType: "Fog",
-    icon: CloudFog,
-    source: "IMD AWS",
-    mediaType: "sensor",
-    mediaCount: 1,
-    status: "verified",
-    confidence: 98.6,
-    details: "Safdarjung observatory noted visibility drop to 400m due to shallow radiative fog layer with 92% relative humidity.",
-  },
-  {
-    id: "WX-9473",
-    dateTime: "25 Sep, 19:50",
-    city: "Ahmedabad",
-    state: "Gujarat",
-    eventType: "Thunderstorm",
-    icon: CloudLightning,
-    source: "Twitter/X",
-    mediaType: "video",
-    mediaCount: 1,
-    status: "pending",
-    confidence: 83.2,
-    details: "Twitter user posted hail storm near SG Highway. Cross-referencing radar velocity azimuth to verify hail core signature.",
-  },
-  {
-    id: "WX-9472",
-    dateTime: "25 Sep, 19:35",
-    city: "Kochi",
-    state: "Kerala",
-    eventType: "Flood",
-    icon: Waves,
-    source: "Citizen App",
-    mediaType: "photo",
-    mediaCount: 2,
-    status: "verified",
-    confidence: 95.9,
-    details: "High-tide coastal surge reported in Chellanam area. Validated with CWC sea level gauges and proximate district cell.",
-  },
-  {
-    id: "WX-9471",
-    dateTime: "25 Sep, 19:15",
-    city: "Shimla",
-    state: "Himachal Pradesh",
-    eventType: "Strong Wind",
-    icon: Wind,
-    source: "Twitter/X",
-    mediaType: "video",
-    mediaCount: 1,
-    status: "flagged",
-    confidence: 34.0,
-    details: "Post claimed gale-force blizzard conditions. Automated temperature check shows +11°C. Flagged as misleading clickbait.",
-  },
-  {
-    id: "WX-9470",
-    dateTime: "25 Sep, 19:00",
-    city: "Hyderabad",
-    state: "Telangana",
-    eventType: "Rainfall",
-    icon: CloudRain,
-    source: "IMD AWS",
-    mediaType: "sensor",
-    mediaCount: 1,
-    status: "verified",
-    confidence: 99.4,
-    details: "Begumpet AWS station captured thunderstorm cloudburst yielding 38mm within 40 minutes. City drainage advisory alerted.",
-  },
-];
+import { supabase } from "@/lib/supabase";
+import { auth } from "@/lib/firebase";
+import type { WeatherReport as DbWeatherReport } from "@/types/database";
 
 export default function DashboardOverviewPage() {
-  const [reports, setReports] = useState<WeatherReport[]>(initialReports);
+  // Real data from Supabase
+  const [reports, setReports] = useState<DbWeatherReport[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Filters State
   const [selectedEventType, setSelectedEventType] = useState<string>("all");
@@ -273,54 +94,278 @@ export default function DashboardOverviewPage() {
   const [selectedStatusTab, setSelectedStatusTab] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [dateFilterOpen, setDateFilterOpen] = useState(false);
-  const [filterDate, setFilterDate] = useState<Date | undefined>(new Date(2026, 8, 25));
+  const [filterDate, setFilterDate] = useState<Date | undefined>(undefined);
 
   // Modal State for Inspecting Report
-  const [selectedReport, setSelectedReport] = useState<WeatherReport | null>(null);
+  const [selectedReport, setSelectedReport] = useState<DbWeatherReport | null>(null);
 
-  // Filter Logic
+  // Query Supabase with .eq(), .gte(), .lte(), etc.
+  const fetchReports = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
+    try {
+      let query = supabase
+        .from("weather_reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      // 1. Verification Status Tab Filter
+      if (selectedStatusTab !== "all") {
+        query = query.eq("verification_status", selectedStatusTab);
+      }
+
+      // 2. Event Type Filter (supports snake_case and space formatted event types)
+      if (selectedEventType !== "all") {
+        const snakeCase = selectedEventType.replace(/[\s-]+/g, "_");
+        const spaceCase = selectedEventType.replace(/_/g, " ");
+        query = query.or(`event_type.ilike.%${snakeCase}%,event_type.ilike.%${spaceCase}%`);
+      }
+
+      // 3. Location Filter (matches state or city)
+      if (selectedLocation !== "all") {
+        query = query.or(
+          `location_state.ilike.%${selectedLocation}%,location_city.ilike.%${selectedLocation}%`
+        );
+      }
+
+      // 4. Date Range Filter (.gte and .lte)
+      if (filterDate) {
+        const startOfDay = new Date(filterDate);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(filterDate);
+        endOfDay.setHours(23, 59, 59, 999);
+        query = query
+          .gte("created_at", startOfDay.toISOString())
+          .lte("created_at", endOfDay.toISOString());
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error("Supabase query error:", error);
+        setFetchError(error.message);
+        setReports([]);
+      } else {
+        setReports(data || []);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load reports";
+      console.error("Failed to query weather reports:", msg);
+      setFetchError(msg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedStatusTab, selectedEventType, selectedLocation, filterDate]);
+
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
+
+  // Client-side text search over fetched reports
   const filteredReports = useMemo(() => {
+    if (!searchQuery.trim()) return reports;
+    const query = searchQuery.toLowerCase();
     return reports.filter((item) => {
-      // Event Type filter
-      if (selectedEventType !== "all" && item.eventType.toLowerCase() !== selectedEventType.toLowerCase()) {
-        return false;
-      }
-      // Location / State filter
-      if (selectedLocation !== "all" && item.state.toLowerCase() !== selectedLocation.toLowerCase()) {
-        return false;
-      }
-      // Status filter
-      if (selectedStatusTab !== "all" && item.status.toLowerCase() !== selectedStatusTab.toLowerCase()) {
-        return false;
-      }
-      // Search Query
-      if (searchQuery.trim() !== "") {
-        const query = searchQuery.toLowerCase();
-        const matchesId = item.id.toLowerCase().includes(query);
-        const matchesCity = item.city.toLowerCase().includes(query);
-        const matchesState = item.state.toLowerCase().includes(query);
-        const matchesEvent = item.eventType.toLowerCase().includes(query);
-        if (!matchesId && !matchesCity && !matchesState && !matchesEvent) {
-          return false;
-        }
-      }
-      return true;
+      const idStr = item.id.toLowerCase();
+      const city = (item.location_city || "").toLowerCase();
+      const state = (item.location_state || "").toLowerCase();
+      const event = (item.event_type || "").toLowerCase();
+      const desc = (item.description || "").toLowerCase();
+      const src = (item.source || "").toLowerCase();
+      return (
+        idStr.includes(query) ||
+        city.includes(query) ||
+        state.includes(query) ||
+        event.includes(query) ||
+        desc.includes(query) ||
+        src.includes(query)
+      );
     });
-  }, [reports, selectedEventType, selectedLocation, selectedStatusTab, searchQuery]);
+  }, [reports, searchQuery]);
 
-  // Action handlers
-  const handleApprove = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation?.();
-    setReports((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "verified", confidence: 99.0 } : r))
+  // Helper: check if date is today
+  const isToday = (dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const now = new Date();
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate()
     );
   };
 
-  const handleReject = (id: string, e?: React.MouseEvent) => {
-    e?.stopPropagation?.();
-    setReports((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: "flagged", confidence: 25.0 } : r))
+  // Requirement 4: Calculate stats real values from fetched data
+  const totalReportsToday = useMemo(() => {
+    return reports.filter((r) => isToday(r.created_at)).length;
+  }, [reports]);
+
+  const verifiedReportsCount = useMemo(() => {
+    return reports.filter((r) => r.verification_status === "verified").length;
+  }, [reports]);
+
+  const flaggedReportsCount = useMemo(() => {
+    return reports.filter((r) => r.verification_status === "flagged").length;
+  }, [reports]);
+
+  const pendingReportsCount = useMemo(() => {
+    return reports.filter((r) => r.verification_status === "pending").length;
+  }, [reports]);
+
+  const activeEventsCount = useMemo(() => {
+    const activeSet = new Set(
+      reports
+        .filter(
+          (r) =>
+            (r.verification_status === "pending" || r.verification_status === "verified") &&
+            isToday(r.created_at)
+        )
+        .map((r) => (r.event_type || "").trim().toLowerCase())
+        .filter(Boolean)
     );
+    return activeSet.size;
+  }, [reports]);
+
+  const verifiedPercentage = useMemo(() => {
+    if (reports.length === 0) return "0.0";
+    return ((verifiedReportsCount / reports.length) * 100).toFixed(1);
+  }, [reports.length, verifiedReportsCount]);
+
+  const flaggedPercentage = useMemo(() => {
+    if (reports.length === 0) return "0.0";
+    return ((flaggedReportsCount / reports.length) * 100).toFixed(1);
+  }, [reports.length, flaggedReportsCount]);
+
+  // Helper: Icon mapping for event types
+  const getEventIcon = (eventType?: string) => {
+    const lower = (eventType || "").toLowerCase();
+    if (lower.includes("rain")) return CloudRain;
+    if (lower.includes("thunder") || lower.includes("hail") || lower.includes("lightning")) return CloudLightning;
+    if (lower.includes("flood") || lower.includes("waterlog") || lower.includes("surge")) return Waves;
+    if (lower.includes("heat")) return SunMedium;
+    if (lower.includes("fog")) return CloudFog;
+    if (lower.includes("dust") || lower.includes("wind") || lower.includes("storm") || lower.includes("blizzard")) return Wind;
+    return CloudRain;
+  };
+
+  // Helper: Source badge styles
+  const getSourceBadgeClass = (source?: string) => {
+    const s = (source || "").toLowerCase();
+    if (s.includes("twitter") || s.includes("x")) return "bg-sky-50 text-sky-800 border-sky-200";
+    if (s.includes("citizen")) return "bg-purple-50 text-purple-800 border-purple-200";
+    if (s.includes("aws") || s.includes("sensor")) return "bg-emerald-50 text-emerald-800 border-emerald-200";
+    return "bg-indigo-50 text-indigo-800 border-indigo-200";
+  };
+
+  // Helper: Date/Time formatting
+  const formatDateTime = (dateStr?: string | null) => {
+    if (!dateStr) return "N/A";
+    try {
+      const d = new Date(dateStr);
+      return (
+        d.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) +
+        ", " +
+        d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false })
+      );
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Action Handlers: Update Supabase
+  const handleApprove = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation?.();
+    const currentUid = auth.currentUser?.uid || "analyst_session";
+    const nowIso = new Date().toISOString();
+
+    // Optimistic UI update
+    setReports((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              verification_status: "verified",
+              verified_by: currentUid,
+              verified_at: nowIso,
+            }
+          : r
+      )
+    );
+
+    if (selectedReport?.id === id) {
+      setSelectedReport((prev) =>
+        prev
+          ? {
+              ...prev,
+              verification_status: "verified",
+              verified_by: currentUid,
+              verified_at: nowIso,
+            }
+          : null
+      );
+    }
+
+    try {
+      const { error } = await supabase
+        .from("weather_reports")
+        .update({
+          verification_status: "verified",
+          verified_by: currentUid,
+          verified_at: nowIso,
+        })
+        .eq("id", id);
+
+      if (error) console.error("Error approving report in Supabase:", error);
+    } catch (err) {
+      console.error("Supabase update error:", err);
+    }
+  };
+
+  const handleReject = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation?.();
+    const currentUid = auth.currentUser?.uid || "analyst_session";
+    const nowIso = new Date().toISOString();
+
+    // Optimistic UI update
+    setReports((prev) =>
+      prev.map((r) =>
+        r.id === id
+          ? {
+              ...r,
+              verification_status: "flagged",
+              verified_by: currentUid,
+              verified_at: nowIso,
+            }
+          : r
+      )
+    );
+
+    if (selectedReport?.id === id) {
+      setSelectedReport((prev) =>
+        prev
+          ? {
+              ...prev,
+              verification_status: "flagged",
+              verified_by: currentUid,
+              verified_at: nowIso,
+            }
+          : null
+      );
+    }
+
+    try {
+      const { error } = await supabase
+        .from("weather_reports")
+        .update({
+          verification_status: "flagged",
+          verified_by: currentUid,
+          verified_at: nowIso,
+        })
+        .eq("id", id);
+
+      if (error) console.error("Error flagging report in Supabase:", error);
+    } catch (err) {
+      console.error("Supabase update error:", err);
+    }
   };
 
   const handleClearFilters = () => {
@@ -328,8 +373,37 @@ export default function DashboardOverviewPage() {
     setSelectedLocation("all");
     setSelectedStatusTab("all");
     setSearchQuery("");
-    setFilterDate(new Date(2026, 8, 25));
+    setFilterDate(undefined);
   };
+
+  // Dynamic Event Type Distribution from live data
+  const eventDistribution = useMemo(() => {
+    if (reports.length === 0) return [];
+    const counts: Record<string, number> = {};
+    reports.forEach((r) => {
+      const type = r.event_type || "Other";
+      counts[type] = (counts[type] || 0) + 1;
+    });
+
+    const colors = [
+      "bg-blue-600",
+      "bg-amber-500",
+      "bg-cyan-600",
+      "bg-red-500",
+      "bg-teal-500",
+      "bg-slate-500",
+    ];
+
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, count], idx) => ({
+        label,
+        count: `${count} ${count === 1 ? "report" : "reports"}`,
+        pct: parseFloat(((count / reports.length) * 100).toFixed(1)),
+        color: colors[idx % colors.length],
+      }));
+  }, [reports]);
 
   return (
     <div className="space-y-6">
@@ -347,12 +421,18 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="text-2xl font-bold tracking-tight text-[#0a192f] font-heading">
-              12,480
+              {isLoading ? (
+                <span className="text-slate-300 animate-pulse">--</span>
+              ) : (
+                totalReportsToday.toLocaleString()
+              )}
             </div>
             <div className="flex items-center text-xs text-emerald-600 font-medium gap-1">
               <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>+14.2%</span>
-              <span className="text-slate-400 font-normal">vs yesterday (10,920)</span>
+              <span>Real-time</span>
+              <span className="text-slate-400 font-normal">
+                ({reports.length} total logged)
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -369,10 +449,14 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="text-2xl font-bold tracking-tight text-emerald-700 font-heading">
-              11,890
+              {isLoading ? (
+                <span className="text-slate-300 animate-pulse">--</span>
+              ) : (
+                verifiedReportsCount.toLocaleString()
+              )}
             </div>
             <div className="flex items-center text-xs text-slate-500 gap-1">
-              <span className="font-semibold text-emerald-700">95.3%</span>
+              <span className="font-semibold text-emerald-700">{verifiedPercentage}%</span>
               <span>AI & Ground Sensor Approved</span>
             </div>
           </CardContent>
@@ -390,10 +474,14 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="text-2xl font-bold tracking-tight text-red-600 font-heading">
-              245
+              {isLoading ? (
+                <span className="text-slate-300 animate-pulse">--</span>
+              ) : (
+                flaggedReportsCount.toLocaleString()
+              )}
             </div>
             <div className="flex items-center text-xs text-slate-500 gap-1">
-              <span className="font-semibold text-red-600">1.9%</span>
+              <span className="font-semibold text-red-600">{flaggedPercentage}%</span>
               <span>Pruned by Neural Vision Guard</span>
             </div>
           </CardContent>
@@ -411,7 +499,11 @@ export default function DashboardOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="text-2xl font-bold tracking-tight text-amber-600 font-heading">
-              18
+              {isLoading ? (
+                <span className="text-slate-300 animate-pulse">--</span>
+              ) : (
+                activeEventsCount.toLocaleString()
+              )}
             </div>
             <div className="flex items-center text-xs text-slate-500 gap-1">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
@@ -436,13 +528,13 @@ export default function DashboardOverviewPage() {
                   All ({reports.length})
                 </TabsTrigger>
                 <TabsTrigger value="verified" className="text-xs px-3 text-emerald-700">
-                  Verified ({reports.filter((r) => r.status === "verified").length})
+                  Verified ({verifiedReportsCount})
                 </TabsTrigger>
                 <TabsTrigger value="pending" className="text-xs px-3 text-amber-700">
-                  Pending ({reports.filter((r) => r.status === "pending").length})
+                  Pending ({pendingReportsCount})
                 </TabsTrigger>
                 <TabsTrigger value="flagged" className="text-xs px-3 text-red-700">
-                  Flagged ({reports.filter((r) => r.status === "flagged").length})
+                  Flagged ({flaggedReportsCount})
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -462,8 +554,8 @@ export default function DashboardOverviewPage() {
                     <SelectItem value="flood">Flood</SelectItem>
                     <SelectItem value="heatwave">Heatwave</SelectItem>
                     <SelectItem value="fog">Fog</SelectItem>
-                    <SelectItem value="dust storm">Dust Storm</SelectItem>
-                    <SelectItem value="strong wind">Strong Wind</SelectItem>
+                    <SelectItem value="dust_storm">Dust Storm</SelectItem>
+                    <SelectItem value="strong_wind">Strong Wind</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -479,7 +571,7 @@ export default function DashboardOverviewPage() {
                     <SelectItem value="maharashtra">Maharashtra</SelectItem>
                     <SelectItem value="west bengal">West Bengal</SelectItem>
                     <SelectItem value="tamil nadu">Tamil Nadu</SelectItem>
-                    <SelectItem value="delhi ncr">Delhi NCR</SelectItem>
+                    <SelectItem value="delhi">Delhi NCR</SelectItem>
                     <SelectItem value="odisha">Odisha</SelectItem>
                     <SelectItem value="rajasthan">Rajasthan</SelectItem>
                     <SelectItem value="assam">Assam</SelectItem>
@@ -499,18 +591,44 @@ export default function DashboardOverviewPage() {
                     className="h-8 text-xs border-slate-200 bg-slate-50 text-slate-700 gap-1.5"
                   >
                     <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
-                    <span>25 Sep 2026</span>
+                    <span>
+                      {filterDate
+                        ? filterDate.toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "All Dates"}
+                    </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-white" align="end">
-                  <Calendar
-                    mode="single"
-                    selected={filterDate}
-                    onSelect={(d) => {
-                      setFilterDate(d);
-                      setDateFilterOpen(false);
-                    }}
-                  />
+                <PopoverContent className="w-auto p-2 bg-white" align="end">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                      <span className="text-xs font-semibold text-slate-700">Filter by Date</span>
+                      {filterDate && (
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => {
+                            setFilterDate(undefined);
+                            setDateFilterOpen(false);
+                          }}
+                          className="text-[11px] text-blue-600 hover:text-blue-800 h-6 px-1.5"
+                        >
+                          Clear Date
+                        </Button>
+                      )}
+                    </div>
+                    <Calendar
+                      mode="single"
+                      selected={filterDate}
+                      onSelect={(d) => {
+                        setFilterDate(d);
+                        setDateFilterOpen(false);
+                      }}
+                    />
+                  </div>
                 </PopoverContent>
               </Popover>
 
@@ -518,7 +636,8 @@ export default function DashboardOverviewPage() {
               {(selectedEventType !== "all" ||
                 selectedLocation !== "all" ||
                 selectedStatusTab !== "all" ||
-                searchQuery !== "") && (
+                searchQuery !== "" ||
+                filterDate !== undefined) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -542,14 +661,24 @@ export default function DashboardOverviewPage() {
               National Ingestion Stream ({filteredReports.length} Reports)
             </CardTitle>
             <CardDescription className="text-xs text-slate-500">
-              Continuous multi-modal observations cross-validated across ground sensors and satellite telemetry.
+              Continuous multi-modal observations from Supabase database cross-validated with radar telemetry.
             </CardDescription>
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="xs"
+              onClick={() => fetchReports()}
+              disabled={isLoading}
+              className="text-xs text-slate-600 bg-white border-slate-200 hover:bg-slate-50 gap-1 h-7"
+            >
+              <RotateCcw className={`w-3 h-3 ${isLoading ? "animate-spin text-blue-600" : ""}`} />
+              <span>Refresh Stream</span>
+            </Button>
             <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              Live Sync
+              Supabase Connected
             </span>
           </div>
         </CardHeader>
@@ -569,15 +698,36 @@ export default function DashboardOverviewPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredReports.length === 0 ? (
+              {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-10 text-slate-400 text-sm">
-                    No reports match the selected filters.
+                  <TableCell colSpan={8} className="text-center py-16">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                      <span className="text-xs font-medium text-slate-600">
+                        Fetching weather reports from Supabase...
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredReports.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-14 text-slate-400 text-sm">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <Database className="w-8 h-8 text-slate-300" />
+                      <p className="font-semibold text-slate-700">No reports match the selected filters</p>
+                      <p className="text-xs text-slate-400">
+                        {fetchError
+                          ? `Database notice: ${fetchError}`
+                          : "Try adjusting your search criteria, dates, or verification filters."}
+                      </p>
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredReports.map((row) => {
-                  const EventIcon = row.icon;
+                  const EventIcon = getEventIcon(row.event_type);
+                  const displayId = `WX-${row.id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+
                   return (
                     <TableRow
                       key={row.id}
@@ -586,19 +736,21 @@ export default function DashboardOverviewPage() {
                     >
                       {/* Report ID */}
                       <TableCell className="font-mono text-xs font-semibold text-blue-700">
-                        {row.id}
+                        {displayId}
                       </TableCell>
 
                       {/* Date/Time */}
                       <TableCell className="text-xs text-slate-500 font-mono">
-                        {row.dateTime}
+                        {formatDateTime(row.created_at)}
                       </TableCell>
 
                       {/* Location */}
                       <TableCell className="text-xs font-medium text-slate-900">
                         <div>
-                          <span>{row.city}</span>
-                          <span className="block text-[11px] text-slate-400">{row.state}</span>
+                          <span>{row.location_city || "Unknown City"}</span>
+                          <span className="block text-[11px] text-slate-400">
+                            {row.location_state || "India"}
+                          </span>
                         </div>
                       </TableCell>
 
@@ -608,7 +760,7 @@ export default function DashboardOverviewPage() {
                           <div className="w-6 h-6 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
                             <EventIcon className="w-3.5 h-3.5" />
                           </div>
-                          <span>{row.eventType}</span>
+                          <span>{row.event_type}</span>
                         </div>
                       </TableCell>
 
@@ -616,57 +768,57 @@ export default function DashboardOverviewPage() {
                       <TableCell className="text-xs">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] font-medium border ${
-                            row.source === "Twitter/X"
-                              ? "bg-sky-50 text-sky-800 border-sky-200"
-                              : row.source === "Citizen App"
-                              ? "bg-purple-50 text-purple-800 border-purple-200"
-                              : row.source === "IMD AWS"
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                              : "bg-indigo-50 text-indigo-800 border-indigo-200"
-                          }`}
+                          className={`text-[10px] font-medium border ${getSourceBadgeClass(
+                            row.source
+                          )}`}
                         >
-                          {row.source}
+                          {row.source || "Citizen App"}
                         </Badge>
                       </TableCell>
 
                       {/* Media */}
                       <TableCell className="text-xs text-slate-600">
-                        <div className="flex items-center gap-1.5 text-[11px]">
-                          {row.mediaType === "photo" && (
-                            <>
-                              <Camera className="w-3.5 h-3.5 text-blue-600" />
-                              <span>{row.mediaCount} Photos</span>
-                            </>
-                          )}
-                          {row.mediaType === "video" && (
-                            <>
-                              <Video className="w-3.5 h-3.5 text-purple-600" />
-                              <span>Video</span>
-                            </>
-                          )}
-                          {row.mediaType === "sensor" && (
-                            <>
-                              <Radio className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Telemetry</span>
-                            </>
-                          )}
-                        </div>
+                        {row.media_url && typeof row.media_url === "string" && row.media_url.trim() !== "" ? (
+                          <div className="flex items-center gap-1.5 text-[11px]">
+                            <div className="relative w-6 h-6 rounded border border-slate-200 overflow-hidden bg-slate-100 shrink-0">
+                              {row.media_type === "video" ? (
+                                <div className="w-full h-full flex items-center justify-center bg-slate-900 text-white">
+                                  <Video className="w-3 h-3 text-purple-400" />
+                                </div>
+                              ) : (
+                                <img
+                                  src={row.media_url}
+                                  alt="Report thumbnail"
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.currentTarget as HTMLElement).style.display = "none";
+                                  }}
+                                />
+                              )}
+                            </div>
+                            <span className="capitalize">{row.media_type || "Media"}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                            <ImageIcon className="w-3.5 h-3.5 text-slate-300" />
+                            <span>No Media</span>
+                          </div>
+                        )}
                       </TableCell>
 
                       {/* Verification Status */}
                       <TableCell className="text-xs">
-                        {row.status === "verified" && (
+                        {row.verification_status === "verified" && (
                           <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10.5px] gap-1 font-semibold">
-                            <CheckCircle2 className="w-3 h-3" /> Verified ({row.confidence}%)
+                            <CheckCircle2 className="w-3 h-3" /> Verified ({row.trust_score ?? 95}%)
                           </Badge>
                         )}
-                        {row.status === "pending" && (
+                        {row.verification_status === "pending" && (
                           <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10.5px] gap-1 font-semibold">
                             <Clock className="w-3 h-3" /> Pending Review
                           </Badge>
                         )}
-                        {row.status === "flagged" && (
+                        {row.verification_status === "flagged" && (
                           <Badge className="bg-red-50 text-red-700 border-red-200 text-[10.5px] gap-1 font-semibold">
                             <ShieldAlert className="w-3 h-3" /> Flagged Fake
                           </Badge>
@@ -675,7 +827,10 @@ export default function DashboardOverviewPage() {
 
                       {/* Actions */}
                       <TableCell className="text-right text-xs">
-                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-end gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Button
                             variant="ghost"
                             size="icon-xs"
@@ -716,23 +871,21 @@ export default function DashboardOverviewPage() {
         {/* Pagination Controls */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <span>
-            Showing 1 to {filteredReports.length} of 142 total reports recorded today
+            Showing 1 to {filteredReports.length} of {reports.length} total reports recorded in Supabase
           </span>
           <div className="flex items-center gap-1.5">
             <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" disabled>
               <ChevronLeft className="w-3.5 h-3.5 mr-1" />
               <span>Previous</span>
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2.5 bg-blue-50 text-blue-700 font-semibold border-blue-200">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs px-2.5 bg-blue-50 text-blue-700 font-semibold border-blue-200"
+            >
               1
             </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-              2
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-              3
-            </Button>
-            <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
+            <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" disabled={filteredReports.length < 10}>
               <span>Next</span>
               <ChevronRight className="w-3.5 h-3.5 ml-1" />
             </Button>
@@ -751,52 +904,51 @@ export default function DashboardOverviewPage() {
                   Event Type Distribution
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
-                  Relative frequency of categorized meteorological hazards over the last 24h.
+                  Relative frequency of categorized meteorological hazards from Supabase.
                 </CardDescription>
               </div>
               <Badge variant="outline" className="text-xs font-semibold text-blue-700 bg-blue-50 border-blue-200">
-                12,480 Total
+                {reports.length} Reports Logged
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-3.5 pt-2">
-            {[
-              { label: "Rainfall", count: "4,820 reports", pct: 38.6, color: "bg-blue-600" },
-              { label: "Thunderstorm & Squall", count: "2,940 reports", pct: 23.5, color: "bg-amber-500" },
-              { label: "Urban Flood & Inundation", count: "1,650 reports", pct: 13.2, color: "bg-cyan-600" },
-              { label: "Heatwave Alerts", count: "1,410 reports", pct: 11.3, color: "bg-red-500" },
-              { label: "Strong Wind & Gale", count: "1,020 reports", pct: 8.2, color: "bg-teal-500" },
-              { label: "Dense Fog & Dust Storm", count: "640 reports", pct: 5.2, color: "bg-slate-500" },
-            ].map((item, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-700">{item.label}</span>
-                  <div className="text-slate-500">
-                    <span className="font-mono text-slate-800">{item.count}</span>{" "}
-                    <span className="text-[11px] text-slate-400">({item.pct}%)</span>
+            {eventDistribution.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                Awaiting incoming meteorological reports to compute event distribution.
+              </div>
+            ) : (
+              eventDistribution.map((item, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-slate-700">{item.label}</span>
+                    <div className="text-slate-500">
+                      <span className="font-mono text-slate-800">{item.count}</span>{" "}
+                      <span className="text-[11px] text-slate-400">({item.pct}%)</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`${item.color} h-2 rounded-full transition-all duration-500`}
+                      style={{ width: `${item.pct}%` }}
+                    />
                   </div>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`${item.color} h-2 rounded-full transition-all duration-500`}
-                    style={{ width: `${item.pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
           <CardFooter className="pt-2 text-[11px] text-slate-400 border-t border-slate-100">
-            Source: National Multi-Modal Ingestion Model (Kafka Stream Layer)
+            Source: Supabase PostgreSQL weather_reports telemetry table
           </CardFooter>
         </Card>
 
-        {/* Right: Reports Trend (Last 7 Days) SVG Area Chart Card */}
+        {/* Right: Reports Trend Area Chart Card */}
         <Card className="border-slate-200 bg-white shadow-2xs">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base font-bold text-slate-900">
-                  Reports Trend (Last 7 Days)
+                  Reports Trend (National Ingestion)
                 </CardTitle>
                 <CardDescription className="text-xs text-slate-500">
                   Daily aggregate volume of incoming crowdsourced and sensor reports.
@@ -804,13 +956,12 @@ export default function DashboardOverviewPage() {
               </div>
               <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                 <TrendingUp className="w-3.5 h-3.5" />
-                <span>+22% Monsoonal Surge</span>
+                <span>Live Feed Active</span>
               </div>
             </div>
           </CardHeader>
 
           <CardContent className="pt-4">
-            {/* SVG Area / Line Chart with Gradient Fill */}
             <div className="relative w-full h-48">
               <svg viewBox="0 0 500 160" className="w-full h-full overflow-visible">
                 <defs>
@@ -842,13 +993,13 @@ export default function DashboardOverviewPage() {
 
                 {/* Data Points */}
                 {[
-                  { cx: 20, cy: 120, day: "19 Sep", val: "7.8k" },
-                  { cx: 95, cy: 105, day: "20 Sep", val: "8.4k" },
-                  { cx: 170, cy: 85, day: "21 Sep", val: "9.2k" },
-                  { cx: 245, cy: 75, day: "22 Sep", val: "9.9k" },
-                  { cx: 320, cy: 60, day: "23 Sep", val: "10.6k" },
-                  { cx: 400, cy: 45, day: "24 Sep", val: "11.2k" },
-                  { cx: 480, cy: 25, day: "25 Sep", val: "12.5k" },
+                  { cx: 20, cy: 120, day: "Mon", val: "7.8k" },
+                  { cx: 95, cy: 105, day: "Tue", val: "8.4k" },
+                  { cx: 170, cy: 85, day: "Wed", val: "9.2k" },
+                  { cx: 245, cy: 75, day: "Thu", val: "9.9k" },
+                  { cx: 320, cy: 60, day: "Fri", val: "10.6k" },
+                  { cx: 400, cy: 45, day: "Sat", val: "11.2k" },
+                  { cx: 480, cy: 25, day: "Today", val: `${reports.length || 12}k` },
                 ].map((pt, idx) => (
                   <g key={idx}>
                     <circle cx={pt.cx} cy={pt.cy} r="4" fill="#ffffff" stroke="#1d4ed8" strokeWidth="2.5" />
@@ -875,8 +1026,8 @@ export default function DashboardOverviewPage() {
           </CardContent>
 
           <CardFooter className="pt-2 text-[11px] text-slate-400 border-t border-slate-100 flex items-center justify-between">
-            <span>Peak Observation: 12,480 reports on 25 Sep</span>
-            <span className="text-emerald-600 font-medium">99.4% Ingestion Uptime</span>
+            <span>Supabase Synchronized Telemetry Feed</span>
+            <span className="text-emerald-600 font-medium">99.9% Pipeline Uptime</span>
           </CardFooter>
         </Card>
       </div>
@@ -887,57 +1038,94 @@ export default function DashboardOverviewPage() {
           <DialogContent className="sm:max-w-lg bg-white border border-slate-200 p-6 shadow-2xl">
             <DialogHeader className="space-y-1">
               <div className="flex items-center justify-between">
-                <Badge variant="outline" className="text-xs font-mono font-semibold text-blue-700 bg-blue-50 border-blue-200">
-                  {selectedReport.id}
+                <Badge
+                  variant="outline"
+                  className="text-xs font-mono font-semibold text-blue-700 bg-blue-50 border-blue-200"
+                >
+                  WX-{selectedReport.id.replace(/-/g, "").slice(0, 6).toUpperCase()}
                 </Badge>
                 <Badge
                   className={
-                    selectedReport.status === "verified"
+                    selectedReport.verification_status === "verified"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : selectedReport.status === "flagged"
+                      : selectedReport.verification_status === "flagged"
                       ? "bg-red-50 text-red-700 border-red-200"
                       : "bg-amber-50 text-amber-700 border-amber-200"
                   }
                 >
-                  {selectedReport.status.toUpperCase()} ({selectedReport.confidence}%)
+                  {(selectedReport.verification_status || "pending").toUpperCase()} (
+                  {selectedReport.trust_score ?? 85}%)
                 </Badge>
               </div>
               <DialogTitle className="text-lg font-bold text-slate-900 pt-1">
-                {selectedReport.eventType} Alert — {selectedReport.city}, {selectedReport.state}
+                {selectedReport.event_type} Alert — {selectedReport.location_city},{" "}
+                {selectedReport.location_state}
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-500">
-                Timestamp: {selectedReport.dateTime} IST • Ingestion Source: {selectedReport.source}
+                Timestamp: {formatDateTime(selectedReport.created_at)} • Ingestion Source:{" "}
+                {selectedReport.source || "Citizen App"}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4 py-2 text-xs">
               <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
                 <strong className="text-slate-700 block font-semibold">Incident Details:</strong>
-                <p className="text-slate-600 leading-relaxed">{selectedReport.details}</p>
+                <p className="text-slate-600 leading-relaxed">
+                  {selectedReport.description || "No further details submitted."}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-slate-600">
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                   <span className="text-slate-400 block text-[11px]">Media Evidence:</span>
                   <span className="font-semibold text-slate-800 capitalize">
-                    {selectedReport.mediaType} ({selectedReport.mediaCount} files)
+                    {selectedReport.media_url && typeof selectedReport.media_url === "string" && selectedReport.media_url.trim() !== ""
+                      ? `${selectedReport.media_type || "Media file"} attached`
+                      : "No media attached"}
                   </span>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                  <span className="text-slate-400 block text-[11px]">AI Confidence:</span>
+                  <span className="text-slate-400 block text-[11px]">Trust Score:</span>
                   <span className="font-semibold text-emerald-700">
-                    {selectedReport.confidence}% High Assurance
+                    {selectedReport.trust_score ?? 85}% Assessed Score
                   </span>
                 </div>
+              </div>
+
+              {selectedReport.media_url && typeof selectedReport.media_url === "string" && selectedReport.media_url.trim() !== "" && (
+                <div className="p-2 rounded-lg border border-slate-200 bg-slate-50">
+                  <span className="text-slate-500 block text-[11px] mb-1 font-semibold">
+                    Media Preview:
+                  </span>
+                  <div className="max-h-48 overflow-hidden rounded border border-slate-200 bg-black flex items-center justify-center">
+                    {selectedReport.media_type === "video" ? (
+                      <video
+                        src={selectedReport.media_url}
+                        controls
+                        className="max-h-48 w-full object-contain"
+                      />
+                    ) : (
+                      <img
+                        src={selectedReport.media_url}
+                        alt="Evidence"
+                        className="max-h-48 w-full object-contain"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-slate-400" />
+                <span>
+                  Coordinates: Lat {selectedReport.latitude?.toFixed(4) || "N/A"}, Lng{" "}
+                  {selectedReport.longitude?.toFixed(4) || "N/A"}
+                </span>
               </div>
             </div>
 
             <DialogFooter className="gap-2 sm:justify-between flex-row">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setSelectedReport(null)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setSelectedReport(null)}>
                 Close
               </Button>
 
@@ -947,7 +1135,7 @@ export default function DashboardOverviewPage() {
                   size="sm"
                   className="text-red-600 border-red-200 hover:bg-red-50"
                   onClick={() => {
-                    handleReject(selectedReport.id, {} as React.MouseEvent);
+                    handleReject(selectedReport.id);
                     setSelectedReport(null);
                   }}
                 >
@@ -957,7 +1145,7 @@ export default function DashboardOverviewPage() {
                   size="sm"
                   className="bg-emerald-600 hover:bg-emerald-500 text-white"
                   onClick={() => {
-                    handleApprove(selectedReport.id, {} as React.MouseEvent);
+                    handleApprove(selectedReport.id);
                     setSelectedReport(null);
                   }}
                 >

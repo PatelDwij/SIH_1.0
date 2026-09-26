@@ -15,6 +15,7 @@ import {
   Layers,
   Radio,
   FileCheck2,
+  CloudRain,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -151,13 +152,23 @@ export function Navbar() {
             </div>
 
             {/* Action Buttons on Far Right */}
-            {/* Action Buttons on Far Right */}
-            <div className="hidden md:flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2.5">
+              <Link href="/report">
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 hover:text-amber-950 font-semibold gap-1.5 shadow-2xs px-3.5 cursor-pointer text-xs"
+                >
+                  <CloudRain className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Report Weather Event</span>
+                </Button>
+              </Link>
+
               <Link href="/login">
                 <Button
                   variant="default"
                   size="default"
-                  className="bg-[#0a192f] hover:bg-[#162f55] text-white gap-2 font-medium shadow-xs border border-[#1b345b] px-4 cursor-pointer"
+                  className="bg-[#0a192f] hover:bg-[#162f55] text-white gap-2 font-medium shadow-xs border border-[#1b345b] px-4 cursor-pointer text-xs"
                 >
                   <Lock className="w-3.5 h-3.5 text-sky-400" />
                   <span>Admin Login</span>
@@ -223,13 +234,24 @@ export function Navbar() {
               })}
             </div>
 
-            {/* Mobile Admin Login Trigger */}
-            <div className="pt-2 border-t border-slate-100">
+            {/* Mobile Action Buttons */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <Link href="/report" onClick={() => setMobileMenuOpen(false)}>
+                <Button
+                  variant="outline"
+                  size="default"
+                  className="w-full border-amber-400 bg-amber-50 text-amber-900 hover:bg-amber-100 font-bold justify-center gap-2 py-2.5 shadow-xs cursor-pointer text-xs"
+                >
+                  <CloudRain className="w-4 h-4 text-amber-600" />
+                  <span>Report Weather Event</span>
+                </Button>
+              </Link>
+
               <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button
                   variant="default"
                   size="default"
-                  className="w-full bg-[#0a192f] hover:bg-[#162f55] text-white justify-center gap-2 py-2.5 shadow-xs cursor-pointer"
+                  className="w-full bg-[#0a192f] hover:bg-[#162f55] text-white justify-center gap-2 py-2.5 shadow-xs cursor-pointer text-xs"
                 >
                   <Lock className="w-4 h-4 text-sky-400" />
                   <span>Admin Login</span>

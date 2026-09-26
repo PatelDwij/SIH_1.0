@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -26,6 +26,7 @@ import {
   ChevronDown,
   AlertTriangle,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { auth, onAuthStateChanged, signOutUser, type User as FirebaseUser } from "@/lib/firebase";
 
 export default function DashboardLayout({
   children,
@@ -90,9 +92,55 @@ export default function DashboardLayout({
     },
   ];
 
-  const handleLogout = () => {
+  // Route Protection & Firebase Auth State
+  const [authLoading, setAuthLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.push("/login");
+      } else {
+        setCurrentUser(user);
+        setAuthLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleLogout = async () => {
+    setUserMenuOpen(false);
+    await signOutUser();
     router.push("/");
   };
+
+  const userDisplayName = currentUser?.displayName || "Analyst - IMD Delhi";
+  const userEmail = currentUser?.email || "analyst.weather@imd.gov.in";
+  const userInitials = currentUser?.displayName
+    ? currentUser.displayName
+        .split(" ")
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "AD";
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#071324] text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-900 flex items-center justify-center text-white shadow-xl ring-1 ring-blue-400/30">
+            <CloudRainWind className="w-6 h-6 text-sky-300 animate-pulse" />
+          </div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
+            <Loader2 className="w-4 h-4 animate-spin text-sky-400" />
+            <span>Verifying IMD Credentials...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-100 text-slate-900">
@@ -222,17 +270,17 @@ export default function DashboardLayout({
               >
                 <Avatar size="sm" className="ring-1 ring-blue-500/40">
                   <AvatarFallback className="bg-blue-700 text-white font-bold text-xs">
-                    AD
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
 
                 {!collapsed && (
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-white truncate">
-                      Analyst - IMD Delhi
+                      {userDisplayName}
                     </p>
                     <p className="text-[10px] text-slate-400 truncate">
-                      analyst.weather@imd.gov.in
+                      {userEmail}
                     </p>
                   </div>
                 )}
@@ -245,8 +293,8 @@ export default function DashboardLayout({
               className="w-56 p-1.5 bg-white border border-slate-200 shadow-xl rounded-xl text-slate-800"
             >
               <div className="px-3 py-2 border-b border-slate-100">
-                <p className="text-xs font-bold text-slate-900">Dr. Dwij Sharma</p>
-                <p className="text-[11px] text-slate-500">Chief Duty Meteorologist</p>
+                <p className="text-xs font-bold text-slate-900">{userDisplayName}</p>
+                <p className="text-[11px] text-slate-500">{userEmail}</p>
                 <Badge variant="outline" className="mt-1 text-[9.5px] text-emerald-700 bg-emerald-50 border-emerald-200">
                   CERT-In Level 3 Auth
                 </Badge>
@@ -396,7 +444,7 @@ export default function DashboardLayout({
             <div className="flex items-center pl-1">
               <Avatar size="sm" className="ring-1 ring-slate-200 cursor-pointer" onClick={() => setUserMenuOpen(true)}>
                 <AvatarFallback className="bg-blue-700 text-white font-bold text-xs">
-                  AD
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
             </div>

@@ -332,6 +332,17 @@ export default function Home() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 pt-3 w-full sm:w-auto">
+              <Link href="/report" className="w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-7 py-2.5 shadow-lg shadow-amber-950/30 gap-2 border border-amber-300"
+                >
+                  <CloudRain className="w-4 h-4 text-slate-950" />
+                  <span>Report Weather Event</span>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+
               <Link href="/dashboard" className="w-full sm:w-auto">
                 <Button
                   size="lg"
@@ -339,7 +350,6 @@ export default function Home() {
                 >
                   <BarChart3 className="w-4 h-4 text-sky-200" />
                   <span>View Live Dashboard</span>
-                  <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
 
